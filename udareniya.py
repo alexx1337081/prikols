@@ -56,29 +56,26 @@ def start_message(message):
 @bot.message_handler(commands=['check'])
 def start_message(message):
     global ans
-    if message.from_user.username != 'difuzlik':
-        d = data
-        words = [d.pop(random.randint(0, len(d))) for i in range(5)]
-        task = []
-        ncorr = random.randint(2, 3)
-        ans = ''
-        for i, word in enumerate(words):
-            if ncorr != 0:
-                task.append(word)
-                ans += str(i+1)
-                ncorr -= 1
-                continue
-            task.append(random_udar(word))
-        bot.send_message(message.chat.id, f'Где правильно ударение стоит епт?\n'
-                                              f'1) {task[0]}\n'
-                                              f'2) {task[1]}\n'
-                                              f'3) {task[2]}\n'
-                                              f'4) {task[3]}\n'
-                                              f'5) {task[4]}')
+    
+    d = data
+    words = [d.pop(random.randint(0, len(d))) for i in range(5)]
+    task = []
+    ncorr = random.randint(2, 3)
+    ans = ''
+    for i, word in enumerate(words):
+        if ncorr != 0:
+            task.append(word)
+            ans += str(i+1)
+            ncorr -= 1
+            continue
+        task.append(random_udar(word))
+    bot.send_message(message.chat.id, f'Где правильно ударение стоит?\n'
+                                      f'1) {task[0]}\n'
+                                      f'2) {task[1]}\n'
+                                      f'3) {task[2]}\n'
+                                      f'4) {task[3]}\n'
+                                      f'5) {task[4]}')
 
-
-    else:
-        bot.send_message(message.chat.id, 'русик пошёл нахуй')
 
 
 
@@ -100,8 +97,6 @@ def callback_message(callback):
 
 @bot.message_handler(content_types=['text'])
 def send_text(message):
-    if message.from_user.username == 'difuzlik':
-        bot.send_message(message.chat.id, 'русик иди в пизду')
     if message.text.lower() == 'иди нахуй':
         bot.send_message(message.chat.id, 'сам иди нахуй пидор ебанный')
     if message.text.lower() == 'соси':
