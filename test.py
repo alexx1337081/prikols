@@ -30,13 +30,19 @@ vowels = ['а', 'о', 'у', 'э', 'ы', 'я', 'ё', 'ю', 'е', 'и']
 
 
 def random_udar(word):
-    if word.split(' (')[0] == word:
-        wordv = word.split(') ')[1]
-        words = word.split(') ')[0] + ') '
+    if '(' in word:
+        if word.split(' (')[0] == word:
+            wordv = word.split(') ')[1]
+            words = word.split(') ')[0] + ') '
+            p = 0
+        else:
+            wordv = word.split(' (')[0]
+            words = '(' + word.split(' (')[1]
+            p = 1
     else:
-        wordv = word.split(' (')[0]
-        words = '(' + word.split(' (')[1]
-    print(words)
+        wordv = word
+        words = ''
+        p = 0
     current_udar = [i for i in range(len(wordv)) if wordv[i] == wordv[i].upper()][0]
     incorr_udars = [i for i in range(len(wordv)) if wordv[i].lower() in vowels]
     incorr_udars.remove(current_udar)
@@ -49,10 +55,11 @@ def random_udar(word):
             continue
         word_udar += let
 
-    return words + word_udar
+    if p == 0: return words + word_udar
+    if p == 1: return word_udar + ' ' + words
 
+task = [('word', 1), ('word', 1), ('word', 1), ('word', 0), ('word', 1)]
+ans = ''.join([str(i+1) for i in range(len(task)) if task[i][1]])
+print(ans)
 
-print(random_udar('прИбыли (на место)'))
-print(random_udar('(ему) завИдно'))
-print(random_udar('красАвчик'))
 
