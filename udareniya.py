@@ -7,26 +7,6 @@ vowels = ['а', 'о', 'у', 'э', 'ы', 'я', 'ё', 'ю', 'е', 'и']
 bot=telebot.TeleBot(token)
 
 
-# def random_udar(word):
-#     res = []
-#     p = 0
-#     q = 1
-#     word = word.lower()
-#     word_udar = ''
-#     for _ in range(len([i for i in word if i in vowels])):
-#         for letter in word:
-#             if letter in vowels:
-#                 p += 1
-#                 if p == q:
-#                     word_udar += letter.upper()
-#                     continue
-#             word_udar += letter
-#         res.append(word_udar)
-#         word_udar = ''
-#         q +=1
-#         p = 0
-#     return res
-
 
 def random_udar(word):
     current_udar = [i for i in range(len(word)) if word[i] == word[i].upper()][0]
