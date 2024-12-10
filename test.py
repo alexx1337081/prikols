@@ -28,6 +28,12 @@ vowels = ['а', 'о', 'у', 'э', 'ы', 'я', 'ё', 'ю', 'е', 'и']
 #         p = 0
 #     return res
 
+def correct_udar(word):
+    for i in data:
+        if word.lower() == i.lower():
+            return i
+
+
 
 def random_udar(word):
     if '(' in word:
@@ -58,8 +64,17 @@ def random_udar(word):
     if p == 0: return words + word_udar
     if p == 1: return word_udar + ' ' + words
 
-task = [('word', 1), ('word', 1), ('word', 1), ('word', 0), ('word', 1)]
-ans = ''.join([str(i+1) for i in range(len(task)) if task[i][1]])
-print(ans)
+def incorr_words(usr_answer, answer):
+    res = set(usr_answer+answer[0]) #общее множество
+    res = res - set(set(answer[0]) & set(usr_answer)) #общее - пересечение
+    return [correct_udar(answer[int(i)]) for i in res]
+
+
+sp = []
+while len(sp) < 5:
+    sp.append(1)
+print(sp)
+
+
 
 
