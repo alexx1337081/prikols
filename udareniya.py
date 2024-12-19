@@ -80,13 +80,14 @@ def start_message(message):
     if message.from_user.id == 1237189946:
         bot.send_message(message.chat.id, 'дарова санёк')
     if message.from_user.id == 1253076174:
-        bot.send_message(message.chat.id, 'Ты самая лучшая, просто знай😘')
-    bot.send_message(message.chat.id,"Это бот для подготовки к 4-ому заданию ЕГЭ по русскому языку, ")
+        bot.send_message(message.chat.id, 'Я люблю тебя!')
+    bot.send_message(message.chat.id,"Это бот для подготовки к 4-ому заданию ЕГЭ по русскому языку\n/check - получить задиние\n/stat - посмотреть статистику")
     print(datetime.datetime.now(),message.from_user.id,message.from_user.username, '-', message.from_user.first_name, message.from_user.last_name, ": ",
           message.text)
 
 @bot.message_handler(commands=['check'])
 def get_task(message):
+    print(message.from_user.first_name, 'взял таску')
     cursor.execute('select id from users')
     users = [i[0] for i in cursor.fetchall()]
     if message.from_user.id not in users:
@@ -138,7 +139,6 @@ def check_stat(message):
         return None
 
     stats = [(i[1], i[4]) for i in query]
-    print(stats)
     stats = sorted(stats, key=lambda x: x[1])
     cursor.execute('select * from users '
                   f'where id = {message.from_user.id}' )
@@ -203,18 +203,20 @@ def send_text(message):
                                '    rating = rating - 3 '
                                f'WHERE id = {message.from_user.id}; ')
                 conn.commit()
+                mistake_print = ''
                 for i in incorr_words(message.text, ans):
+                    mistake_print += f'\n\t{i}'
                     cursor.execute('INSERT INTO problems (user_id, word, mistakes)'
                                   f"VALUES ({message.from_user.id}, '{i}', 1)"
                                    'ON CONFLICT (word)'
                                    'DO UPDATE SET mistakes = problems.mistakes + 1')
                 conn.commit()
                 is_ans = 0
+                bot.send_message(message.chat.id, f'ошибки в словах:' + mistake_print)
             for i in corr_words(message.text, ans):
                 cursor.execute('UPDATE problems '
                                'SET mistakes = mistakes - 1 '
                               f"WHERE word = '{i}'")
-                print(i)
                 conn.commit()
             cursor.execute('DELETE FROM problems WHERE mistakes <= 0')
             conn.commit()
