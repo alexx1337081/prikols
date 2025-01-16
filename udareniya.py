@@ -5,11 +5,11 @@ from nado import data, bred
 import random
 import psycopg2
 from telebot import types
-token='7868964757:AAEN8BRIyF6CJHOKT1ywAr424zFlW68NY6M'
+token='7фывфыв'
 vowels = ['а', 'о', 'у', 'э', 'ы', 'я', 'ё', 'ю', 'е', 'и']
 bot=telebot.TeleBot(token)
-conn = psycopg2.connect(dbname='udar', user='alex',
-                        password='0209', host='192.168.1.75')
+conn = psycopg2.connect(dbname='фывфыв', user='фывфв',
+                        password='фывфыв', host='фывфывфыв')
 cursor = conn.cursor()
 
 
