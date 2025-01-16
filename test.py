@@ -1,6 +1,6 @@
 import random
 from fnmatch import fnmatch
-
+import emoji
 
 
 
@@ -69,11 +69,9 @@ def incorr_words(usr_answer, answer):
     res = res - set(set(answer[0]) & set(usr_answer)) #общее - пересечение
     return [correct_udar(answer[int(i)]) for i in res]
 
-
-sp = []
-while len(sp) < 5:
-    sp.append(1)
-print(sp)
+s = [1, 2, 3, 4, 5, 6]
+print(s[1:])
+print(*range(1,6))
 
 
 

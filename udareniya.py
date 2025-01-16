@@ -1,9 +1,10 @@
 import telebot
 import datetime
-
+import emoji
 from nado import data, bred
 import random
 import psycopg2
+from telebot import types
 token='7868964757:AAEN8BRIyF6CJHOKT1ywAr424zFlW68NY6M'
 vowels = ['а', 'о', 'у', 'э', 'ы', 'я', 'ё', 'ю', 'е', 'и']
 bot=telebot.TeleBot(token)
@@ -13,11 +14,88 @@ cursor = conn.cursor()
 
 
 
+def is_emoji(s):
+    return s in emoji.UNICODE_EMOJI
+
+
 def correct_udar(word):
     for i in data:
         if word.lower() == i.lower():
             return i
     return 'хз'
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call):
+    bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    click = call.data.split('_')[0]
+    user_id = call.data.split('_')[1]
+    if call.message:
+        if click == "check":
+            cursor.execute('select word from problems '
+                           f'where user_id = {user_id} and mistakes = (select max(mistakes) from problems where user_id = {user_id})')
+            pwords = cursor.fetchall()
+            if not pwords:
+                words = random.sample(data, 5)
+            else:
+                words = random.sample(data, 4)
+                while len(words) < 5:
+                    pword = random.choice(pwords)[0]
+                    if pword.lower() not in [i.lower() for i in words]:
+                        words.append(pword)
+                random.shuffle(words)
+            task = []
+            ncorr = random.randint(2, 4)
+            ans = []
+            for i, word in enumerate(words):
+                if ncorr != 0:
+                    task.append((word, 1))
+                    ncorr -= 1
+                    continue
+                task.append((random_udar(word), 0))
+            random.shuffle(task)
+            ans.append(''.join([str(i + 1) for i in range(len(task)) if task[i][1]]))
+            ans.extend([i[0] for i in task])
+            bot.send_message(user_id, f'Где правильно ударение стоит?\n'
+                                              f'1) {task[0][0]}\n'
+                                              f'2) {task[1][0]}\n'
+                                              f'3) {task[2][0]}\n'
+                                              f'4) {task[3][0]}\n'
+                                              f'5) {task[4][0]}')
+            cursor.execute('INSERT INTO events (user_id, ans, word1, word2, word3, word4, word5)'
+                           f"VALUES ({user_id}, '{ans[0]}', '{ans[1]}', '{ans[2]}', '{ans[3]}', '{ans[4]}', '{ans[5]}')"
+                           'ON CONFLICT (user_id)'
+                           f"DO UPDATE SET ans = '{ans[0]}', "
+                           f"              word1 = '{ans[1]}',"
+                           f"              word2 = '{ans[2]}',"
+                           f"              word3 = '{ans[3]}',"
+                           f"              word4 = '{ans[4]}',"
+                           f"              word5 = '{ans[5]}'")
+            conn.commit()
+        if click == "stat":
+            cursor.execute('select * from users')
+            query = cursor.fetchall()
+            stats = [(i[1], i[4], i[0]) for i in query]
+            stats = sorted(stats, key=lambda x: x[1])
+            cursor.execute('select * from users '
+                           f'where id = {user_id}')
+            query = cursor.fetchall()
+            otvet = types.InlineKeyboardMarkup(row_width=3)
+            button1 = types.InlineKeyboardButton("Получить задание📲", callback_data=f'check_{user_id}')
+            otvet.add(button1)
+            if str(stats[0][2]) == user_id:
+                pozor = 'Cамый главный лошарик - ВЫ😲'
+            else:
+                pozor = (f'Cамый главный лошарик - {stats[0][0] or 'пока без имени'}\n'
+                         f'С рейтингом: {stats[0][1]}')
+            bot.send_message(user_id, f'Всего решено заданий: {query[0][2]}\n'
+                                              f'Ваш винрейт: {round(query[0][3] / query[0][2] * 100, 1)}%\n'
+                                              f'Ваш рейтинг: {query[0][4]}\n'+
+                                              pozor, reply_markup=otvet)
+
+
+
+
 
 def corr_words(usr_answer, answer):
     res = set(set(answer[0]) & set(usr_answer))#общее - пересечение
@@ -27,6 +105,17 @@ def incorr_words(usr_answer, answer):
     res = set(usr_answer+answer[0]) #общее множество
     res = res - set(set(answer[0]) & set(usr_answer))#общее - пересечение
     return [correct_udar(answer[int(i)]) for i in res]
+
+
+def check_reg(id):
+    cursor.execute('SELECT id FROM users')
+    if id not in [i[0] for i in cursor.fetchall()]:
+        cursor.execute(f"INSERT INTO users(id, total_tasks, correct_tasks, rating) VALUES({id}, 0, 0, 0)")
+        conn.commit()
+        print('новый пользователь**************', id)
+        return False
+    else:
+        return True
 
 
 def random_udar(word):
@@ -47,7 +136,7 @@ def random_udar(word):
     incorr_udars = [i for i in range(len(wordv)) if wordv[i].lower() in vowels]
     incorr_udars.remove(current_udar)
     incorr_udar = random.choice(incorr_udars)
-    wordv = wordv.lower()
+    wordv = wordv.lower().replace('ё', 'е')
     word_udar = ''
     for i, let in enumerate(wordv):
         if i == incorr_udar:
@@ -59,21 +148,6 @@ def random_udar(word):
     if p == 1: return word_udar + ' ' + words
 
 
-@bot.message_handler(commands=['reg'])
-def register(message):
-    global reg
-    global is_ans
-    is_ans = 0
-    cursor.execute('select id from users')
-    users = [i[0] for i in cursor.fetchall()]
-    if message.from_user.id not in users:
-        bot.send_message(message.chat.id, 'тебя нет в базе, введи своё имя(до 40 символов, поменять нельзя ваще, подумай хорошенько)')
-        reg = 1
-    else:
-        bot.send_message(message.chat.id, 'какой рег, ты есть уже')
-        print(datetime.datetime.now(), message.from_user.id, message.from_user.username, '-',
-              message.from_user.first_name, message.from_user.last_name, ": тщетно пытается зарегаться",)
-
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -81,64 +155,24 @@ def start_message(message):
         bot.send_message(message.chat.id, 'дарова санёк')
     if message.from_user.id == 1253076174:
         bot.send_message(message.chat.id, 'Я люблю тебя!')
-    bot.send_message(message.chat.id,"Это бот для подготовки к 4-ому заданию ЕГЭ по русскому языку\n/check - получить задиние\n/stat - посмотреть статистику")
+    check_reg(message.from_user.id)
+    otvet = types.InlineKeyboardMarkup(row_width=3)
+    button1 = types.InlineKeyboardButton("Получить задание📲", callback_data=f'check_{message.from_user.id}')
+    otvet.add(button1)
+    bot.send_message(message.chat.id,"Это бот для подготовки к 4-ому заданию ЕГЭ по русскому языку", reply_markup=otvet)
     print(datetime.datetime.now(),message.from_user.id,message.from_user.username, '-', message.from_user.first_name, message.from_user.last_name, ": ",
           message.text)
 
-@bot.message_handler(commands=['check'])
-def get_task(message):
-    print(message.from_user.first_name, 'взял таску')
-    cursor.execute('select id from users')
-    users = [i[0] for i in cursor.fetchall()]
-    if message.from_user.id not in users:
-        bot.send_message(message.chat.id, 'ты не зареган пиши /reg')
-        return None
-    cursor.execute('select word from problems '
-                  f'where user_id = {message.from_user.id} and mistakes = (select max(mistakes) from problems)')
-    pwords = cursor.fetchall()
-    global ans
-    global reg
-    reg = 0
-    if not pwords:
-        words = random.sample(data, 5)
-    else:
-        words = random.sample(data, 4)
-        while len(words) < 5:
-            pword = random.choice(pwords)[0]
-            if pword.lower() not in [i.lower() for i in words]:
-                words.append(pword)
-        random.shuffle(words)
-    task = []
-    ncorr = random.randint(2, 4)
-    ans = []
-    for i, word in enumerate(words):
-        if ncorr != 0:
-            task.append((word, 1))
-            ncorr -= 1
-            continue
-        task.append((random_udar(word), 0))
-    random.shuffle(task)
-    ans.append(''.join([str(i+1) for i in range(len(task)) if task[i][1]]))
-    ans.extend([i[0] for i in task])
-    bot.send_message(message.chat.id, f'Где правильно ударение стоит?\n'
-                                          f'1) {task[0][0]}\n'
-                                          f'2) {task[1][0]}\n'
-                                          f'3) {task[2][0]}\n'
-                                          f'4) {task[3][0]}\n'
-                                          f'5) {task[4][0]}')
-    global is_ans
-    is_ans = 1
 
 @bot.message_handler(commands=['stat'])
 def check_stat(message):
+    print(datetime.datetime.now(), message.from_user.id, message.from_user.username, '-', message.from_user.first_name,
+          message.from_user.last_name, ": ",
+          message.text)
+    check_reg(message.from_user.id)
     cursor.execute('select * from users')
     query = cursor.fetchall()
-    users = [i[0] for i in query]
-    if message.from_user.id not in users:
-        bot.send_message(message.chat.id, 'куда тебе стат давай пиши /reg')
-        return None
-
-    stats = [(i[1], i[4]) for i in query]
+    stats = [(i[1], i[4], i[0]) for i in query]
     stats = sorted(stats, key=lambda x: x[1])
     cursor.execute('select * from users '
                   f'where id = {message.from_user.id}' )
@@ -147,8 +181,11 @@ def check_stat(message):
         bot.send_message(message.chat.id, f'всего решено заданий: {query[0][2]}\n'
                                               f'правильно из них решено: {query[0][3]} ({round(query[0][3]/query[0][2]*100, 1)}%)\n'
                                               f'рейтинг: {query[0][4]}')
-        bot.send_message(message.chat.id,f'самый главный лошарик - {stats[0][0]}\n'
-                         f'рейтинг позорника: {stats[0][1]}')
+        if stats[0][2] == message.from_user.id:
+            bot.send_message(message.chat.id, f'самый главный лошарик - ВЫ😲')
+        else:
+            bot.send_message(message.chat.id,f'самый главный лошарик - {stats[0][0] or 'пока без имени'}\n'
+                                                  f'рейтинг позорника: {stats[0][1]}')
     else:
         bot.send_message(message.chat.id, 'ты ниче не решал')
 
@@ -159,24 +196,16 @@ def send_text(message):
     print(datetime.datetime.now(), message.from_user.username, '-', message.from_user.first_name,
           message.from_user.last_name, ": ",
           message.text)
-    global reg
-    if reg:
-        if len(message.text) > 40:
-            bot.send_message(message.chat.id, 'меньше сорока камон')
-            reg = 0
-            return None
-        cursor.execute('INSERT INTO users '
-                       f"VALUES ({message.from_user.id}, '{message.text}', 0, 0, 0)")
-        conn.commit()
-        print('новый пользователь', message.from_user.id, message.from_user.first_name, message.from_user.last_name, ": ", message.text)
-        bot.send_message(message.chat.id, 'успешно')
-        reg = 0
-        return None
-    button1 = telebot.types.KeyboardButton("/check")
-    keyboard = telebot.types.ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
+    check_reg(message.from_user.id)
+    otvet = types.InlineKeyboardMarkup(row_width=3)
+    button1 = types.InlineKeyboardButton("Ещё задание📲", callback_data=f'check_{message.from_user.id}')
+    button2  = types.InlineKeyboardButton("Моя статистика📊", callback_data=f'stat_{message.from_user.id}')
+    otvet.add(button1, button2)
     string = message.text
-    global is_ans
-    if is_ans:
+    cursor.execute(f'select * from events where user_id = {message.from_user.id}')
+    query = cursor.fetchall()
+    if query:
+        ans = [i for i in query[0]][2:]
         try:
             int(string)
         except ValueError:
@@ -186,37 +215,37 @@ def send_text(message):
                 map(lambda x: int(x) >= 1 and int(x) <= 5, string)) and string == ''.join(
                 sorted([str(i) for i in string])) and len(set(string)) == len(string):
             if message.text == ans[0]:
-                keyboard.add(button1)
-                bot.send_message(message.chat.id, 'пральна', reply_markup=keyboard)
+                bot.send_message(message.chat.id, 'Верно', reply_markup=otvet)
                 cursor.execute('UPDATE users '
                                'SET total_tasks = total_tasks + 1, '
                                '    correct_tasks = correct_tasks + 1, '
                                '    rating = rating + 1 '
                                f'WHERE id = {message.from_user.id};')
                 conn.commit()
-                is_ans = 0
+                cursor.execute(f'DELETE FROM events WHERE user_id = {message.from_user.id}')
+                conn.commit()
             else:
-                keyboard.add(button1)
-                bot.send_message(message.chat.id, f'нипральна, пральна будет {ans[0]}', reply_markup=keyboard)
                 cursor.execute('UPDATE users '
                                'SET total_tasks = total_tasks + 1, '
                                '    rating = rating - 3 '
                                f'WHERE id = {message.from_user.id}; ')
+                conn.commit()
+                cursor.execute(f'DELETE FROM events WHERE user_id = {message.from_user.id}')
                 conn.commit()
                 mistake_print = ''
                 for i in incorr_words(message.text, ans):
                     mistake_print += f'\n\t{i}'
                     cursor.execute('INSERT INTO problems (user_id, word, mistakes)'
                                   f"VALUES ({message.from_user.id}, '{i}', 1)"
-                                   'ON CONFLICT (word)'
-                                   'DO UPDATE SET mistakes = problems.mistakes + 1')
-                conn.commit()
-                is_ans = 0
-                bot.send_message(message.chat.id, f'ошибки в словах:' + mistake_print)
+                                   'ON CONFLICT (user_id, word)'
+                                   'DO UPDATE SET mistakes = problems.mistakes + 1 '
+                                  f"WHERE problems.word = '{i}' AND problems.user_id = {message.from_user.id}")
+                    conn.commit()
+                bot.send_message(message.chat.id, f'Неверно, правильный ответ {ans[0]}\nошибки в словах:' + mistake_print, reply_markup=otvet)
             for i in corr_words(message.text, ans):
                 cursor.execute('UPDATE problems '
                                'SET mistakes = mistakes - 1 '
-                              f"WHERE word = '{i}'")
+                              f"WHERE word = '{i}' AND user_id = {message.from_user.id}")
                 conn.commit()
             cursor.execute('DELETE FROM problems WHERE mistakes <= 0')
             conn.commit()
@@ -226,4 +255,7 @@ def send_text(message):
 
 
 print('поехал')
-bot.infinity_polling()
+try:
+    bot.infinity_polling(none_stop=True)
+except:
+    print('фигня')
