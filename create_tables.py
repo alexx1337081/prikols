@@ -28,11 +28,23 @@ cursor = conn.cursor()
 #                'word5 varchar(40))')
 
 
-cursor.execute('CREATE TABLE easy_words('
-               'id serial PRIMARY KEY,'
-               'word text,'
-               'variant text,'
-               'score int,'
-               'UNIQUE(word, variant))')
+#cursor.execute('CREATE TABLE easy_words('
+#               'id serial PRIMARY KEY,'
+#               'word text,'
+#               'variants text,'
+#               'UNIQUE (word))')
+
+# cursor.execute('CREATE TABLE admin_sessions('
+#                'id serial PRIMARY KEY,'
+#                'user_id text,'
+#                'question int,'
+#                'UNIQUE (word))')
+
+# cursor.execute('CREATE TABLE test2('
+#                'id serial PRIMARY KEY,'
+#                'sname text,'
+#                'class text,'
+#                'result1 int,'
+#                'result2 int)')
 
 conn.commit()

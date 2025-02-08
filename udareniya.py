@@ -1,16 +1,71 @@
+from random import choice
+
 import telebot
 import datetime
 import emoji
-from nado import data, bred
+from nado import data, bred, good_stickers, bad_stickers
 import random
 import psycopg2
 from telebot import types
-token='7фывфыв'
+token='7868964757:AAEN8BRIyF6CJHOKT1ywAr424zFlW68NY6M'
 vowels = ['а', 'о', 'у', 'э', 'ы', 'я', 'ё', 'ю', 'е', 'и']
 bot=telebot.TeleBot(token)
-conn = psycopg2.connect(dbname='фывфыв', user='фывфв',
-                        password='фывфыв', host='фывфывфыв')
+conn = psycopg2.connect(dbname='udar', user='alex',
+                        password='0209', host='192.168.1.75')
 cursor = conn.cursor()
+
+def current_udar(word):
+    for i, let in enumerate(word):
+        if let == let.upper():
+            return i
+
+
+@bot.message_handler(commands=['replist'])
+def replist(message):
+    cursor.execute('SELECT word, variants FROM easy_words')
+    easy_words = cursor.fetchall()
+    if not easy_words:
+        bot.send_message(message.chat.id, 'пусто')
+        return None
+    easy_words = ''.join([f'{word[:int(udar)].lower() + word[int(udar):].capitalize()}\n' for word, udar in easy_words])
+    bot.send_message(message.chat.id, easy_words)
+    print(datetime.datetime.now(),message.from_user.id,message.from_user.username, '-', message.from_user.first_name, message.from_user.last_name, ": ",
+          message.text)
+
+
+@bot.message_handler(commands=['udar'])
+def check_udar(message):
+    bot.send_message(message.chat.id, correct_udar(message.text.split('udar ')[1]))
+    print(datetime.datetime.now(),message.from_user.id,message.from_user.username, '-', message.from_user.first_name, message.from_user.last_name, ": ",
+          message.text)
+
+
+@bot.message_handler(commands=['rep'])
+def report(message):
+    print(datetime.datetime.now(), message.from_user.id, message.from_user.username, '-', message.from_user.first_name,
+          message.from_user.last_name, ": ",
+          message.text)
+    rep_index = message.text.split('rep ')[1]
+    try:
+        int(rep_index)
+    except:
+        bot.send_message(message.from_user.id, 'ошибка ввода')
+        return None
+    cursor.execute(f'SELECT word{rep_index} FROM events WHERE user_id = {message.from_user.id}')
+    query = cursor.fetchall()
+    if not query:
+        bot.send_message(message.from_user.id, 'у вас нет задания пока')
+        return None
+    word = query[0][0]
+    if word == correct_udar(word):
+        bot.send_message(message.from_user.id, 'это правильное слово дурак')
+        return None
+    cursor.execute('INSERT INTO easy_words(word, variants) '
+                  f"VALUES('{correct_udar(word)}', '{current_udar(word)}')"
+                   'ON CONFLICT (word)'
+                   f'''DO UPDATE SET variants = CONCAT(easy_words.variants, '{current_udar(word)}')''')
+    bot.send_message(message.from_user.id, 'добавил')
+    conn.commit()
 
 
 
@@ -22,7 +77,8 @@ def correct_udar(word):
     for i in data:
         if word.lower() == i.lower():
             return i
-    return 'хз'
+    print('АААААААААААААААААААААААААААААААААААААААААААААААААААААААААААААААААА', word)
+    return 'Произошла ошибка скиньте скрин сане'
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -32,9 +88,14 @@ def callback_inline(call):
     user_id = call.data.split('_')[1]
     if call.message:
         if click == "check":
-            cursor.execute('select word from problems '
-                           f'where user_id = {user_id} and mistakes = (select max(mistakes) from problems where user_id = {user_id})')
-            pwords = cursor.fetchall()
+            if user_id != '1131169121' and user_id != '1237189946':
+                cursor.execute('select word from problems '
+                               f'where user_id = {user_id} and mistakes = (select max(mistakes) from problems where user_id = {user_id})')
+                pwords = cursor.fetchall()
+            else:
+                pwords = []
+            cursor.execute('SELECT word, variants FROM easy_words')
+            easy_words = dict(cursor.fetchall())
             if not pwords:
                 words = random.sample(data, 5)
             else:
@@ -44,24 +105,30 @@ def callback_inline(call):
                     if pword.lower() not in [i.lower() for i in words]:
                         words.append(pword)
                 random.shuffle(words)
+            words_easy = []
+            for word in words:
+                try:
+                    words_easy.append((word, easy_words[word]))
+                except KeyError:
+                    words_easy.append((word, None))
             task = []
             ncorr = random.randint(2, 4)
             ans = []
-            for i, word in enumerate(words):
+            for i, word in enumerate(words_easy):
                 if ncorr != 0:
-                    task.append((word, 1))
+                    task.append((word[0], 1))
                     ncorr -= 1
                     continue
-                task.append((random_udar(word), 0))
+                task.append((random_udar(word[0], word[1]), 0))
             random.shuffle(task)
             ans.append(''.join([str(i + 1) for i in range(len(task)) if task[i][1]]))
             ans.extend([i[0] for i in task])
             bot.send_message(user_id, f'Где правильно ударение стоит?\n'
-                                              f'1) {task[0][0]}\n'
-                                              f'2) {task[1][0]}\n'
-                                              f'3) {task[2][0]}\n'
-                                              f'4) {task[3][0]}\n'
-                                              f'5) {task[4][0]}')
+                                              f'1) {task[0][0].replace('ё', 'е')}\n'
+                                              f'2) {task[1][0].replace('ё', 'е')}\n'
+                                              f'3) {task[2][0].replace('ё', 'е')}\n'
+                                              f'4) {task[3][0].replace('ё', 'е')}\n'
+                                              f'5) {task[4][0].replace('ё', 'е')}')
             cursor.execute('INSERT INTO events (user_id, ans, word1, word2, word3, word4, word5)'
                            f"VALUES ({user_id}, '{ans[0]}', '{ans[1]}', '{ans[2]}', '{ans[3]}', '{ans[4]}', '{ans[5]}')"
                            'ON CONFLICT (user_id)'
@@ -73,6 +140,7 @@ def callback_inline(call):
                            f"              word5 = '{ans[5]}'")
             conn.commit()
         if click == "stat":
+            print(datetime.datetime.now(), user_id, ": ", "stat")
             cursor.execute('select * from users')
             query = cursor.fetchall()
             stats = [(i[1], i[4], i[0]) for i in query]
@@ -88,12 +156,19 @@ def callback_inline(call):
             else:
                 pozor = (f'Cамый главный лошарик - {stats[0][0] or 'пока без имени'}\n'
                          f'С рейтингом: {stats[0][1]}')
-            bot.send_message(user_id, f'Всего решено заданий: {query[0][2]}\n'
-                                              f'Ваш винрейт: {round(query[0][3] / query[0][2] * 100, 1)}%\n'
-                                              f'Ваш рейтинг: {query[0][4]}\n'+
-                                              pozor, reply_markup=otvet)
-
-
+            if query[0][2] != 0:
+                bot.send_message(user_id, f'Всего решено заданий: {query[0][2]}\n'
+                                                  f'Ваш винрейт: {round(query[0][3] / query[0][2] * 100, 1)}%\n'
+                                                  f'Ваш рейтинг: {query[0][4]}\n'+
+                                                  pozor, reply_markup=otvet)
+            else:
+                bot.send_message(user_id, f'Всего решено заданий: {query[0][2]}\n'
+                                          f'Ваш винрейт: 0%\n'
+                                          f'Ваш рейтинг: {query[0][4]}\n' +
+                                 pozor, reply_markup=otvet)
+            if (query[0][4] < -20 or query[0][4]>100) and random.randint(1, 5) == 1:
+                bot.send_sticker(user_id, 'CAACAgIAAxkBAAENhvRni5gowxQt69PCJa_Ee0EThagJgwAC0FQAAgIhGEteqE-U3SzeJTYE')
+                print('сколько нафиг')
 
 
 
@@ -118,7 +193,7 @@ def check_reg(id):
         return True
 
 
-def random_udar(word):
+def random_udar(word, easy_udars):
     if '(' in word:
         if word.split(' (')[0] == word:
             wordv = word.split(') ')[1]
@@ -135,8 +210,12 @@ def random_udar(word):
     current_udar = [i for i in range(len(wordv)) if wordv[i] == wordv[i].upper()][0]
     incorr_udars = [i for i in range(len(wordv)) if wordv[i].lower() in vowels]
     incorr_udars.remove(current_udar)
+    if easy_udars != None:
+        for i in easy_udars:
+            print(word, i)
+            incorr_udars.remove(int(i))
     incorr_udar = random.choice(incorr_udars)
-    wordv = wordv.lower().replace('ё', 'е')
+    wordv = wordv.lower()
     word_udar = ''
     for i, let in enumerate(wordv):
         if i == incorr_udar:
@@ -193,9 +272,6 @@ def check_stat(message):
 
 @bot.message_handler(content_types=['text'])
 def send_text(message):
-    print(datetime.datetime.now(), message.from_user.username, '-', message.from_user.first_name,
-          message.from_user.last_name, ": ",
-          message.text)
     check_reg(message.from_user.id)
     otvet = types.InlineKeyboardMarkup(row_width=3)
     button1 = types.InlineKeyboardButton("Ещё задание📲", callback_data=f'check_{message.from_user.id}')
@@ -215,7 +291,12 @@ def send_text(message):
                 map(lambda x: int(x) >= 1 and int(x) <= 5, string)) and string == ''.join(
                 sorted([str(i) for i in string])) and len(set(string)) == len(string):
             if message.text == ans[0]:
+                if random.randint(1, 3) == 1:
+                    bot.send_sticker(message.chat.id, random.choice(good_stickers))
                 bot.send_message(message.chat.id, 'Верно', reply_markup=otvet)
+                print(datetime.datetime.now(), message.from_user.username, '-', message.from_user.first_name,
+                      message.from_user.last_name, ": ",
+                      message.text, "✅")
                 cursor.execute('UPDATE users '
                                'SET total_tasks = total_tasks + 1, '
                                '    correct_tasks = correct_tasks + 1, '
@@ -241,7 +322,12 @@ def send_text(message):
                                    'DO UPDATE SET mistakes = problems.mistakes + 1 '
                                   f"WHERE problems.word = '{i}' AND problems.user_id = {message.from_user.id}")
                     conn.commit()
+                if random.randint(1, 3) == 1:
+                    bot.send_sticker(message.chat.id, random.choice(bad_stickers))
                 bot.send_message(message.chat.id, f'Неверно, правильный ответ {ans[0]}\nошибки в словах:' + mistake_print, reply_markup=otvet)
+                print(datetime.datetime.now(), message.from_user.username, '-', message.from_user.first_name,
+                      message.from_user.last_name, ": ",
+                      message.text, "❌")
             for i in corr_words(message.text, ans):
                 cursor.execute('UPDATE problems '
                                'SET mistakes = mistakes - 1 '
@@ -254,8 +340,7 @@ def send_text(message):
 
 
 
+
 print('поехал')
-try:
-    bot.infinity_polling(none_stop=True)
-except:
-    print('фигня')
+
+bot.infinity_polling(timeout=10, long_polling_timeout = 5)

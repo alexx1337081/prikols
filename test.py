@@ -3,7 +3,6 @@ from fnmatch import fnmatch
 import emoji
 
 
-
 from nado import data
 
 vowels = ['а', 'о', 'у', 'э', 'ы', 'я', 'ё', 'ю', 'е', 'и']
@@ -30,8 +29,9 @@ vowels = ['а', 'о', 'у', 'э', 'ы', 'я', 'ё', 'ю', 'е', 'и']
 
 def correct_udar(word):
     for i in data:
-        if word.lower() == i.lower():
+        if word.lower().replace('ё', 'е') == i.lower().replace('ё', 'е'):
             return i
+    return 'хз'
 
 
 
@@ -69,10 +69,5 @@ def incorr_words(usr_answer, answer):
     res = res - set(set(answer[0]) & set(usr_answer)) #общее - пересечение
     return [correct_udar(answer[int(i)]) for i in res]
 
-s = [1, 2, 3, 4, 5, 6]
-print(s[1:])
-print(*range(1,6))
 
-
-
-
+print(random_udar('углублЁнный'))
