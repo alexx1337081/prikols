@@ -7,7 +7,7 @@ from nado import data, bred, good_stickers, bad_stickers
 import random
 import psycopg2
 from telebot import types
-token='7868964757:AAEN8BRIyF6CJHOKT1ywAr424zFlW68NY6M'
+token=''
 vowels = ['а', 'о', 'у', 'э', 'ы', 'я', 'ё', 'ю', 'е', 'и']
 bot=telebot.TeleBot(token)
 conn = psycopg2.connect(dbname='udar', user='alex',
